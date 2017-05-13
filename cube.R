@@ -1,11 +1,5 @@
+library(stringr)
 library(tidyverse)
-
-
-#lifts <- tibble(
-#	squat = c("heavy", "explosive", "rep"),
-#	bench = c("explosive", "rep", "heavy"),
-#	deadlift = c("rep", "heavy", "explosive")
-#)
 
 
 cube <- tibble(
@@ -15,13 +9,43 @@ cube <- tibble(
 )
 
 
-workout_string = Vectorize(function(day, wave) cube[[day]][wave])
+# remove "rep(s)"
+cube <- as.tibble(
+	apply(cube, 2, function(x) x %>% str_replace_all(c(" reps " = " ", "x 1 rep" = "-")))
+)
+
+
+# remove "set(s)"
+cube <- as.tibble(
+	apply(cube, 2, function(x) str_replace_all(
+		x, "x \\d set(?:s)?", function(x) strrep("-", as.integer(substr(x, 3, 3)))
+	))
+)
+
+
+one_rep_max <- c(
+	squat = 130,
+	bench = 95,
+	deadlift = 140
+)
+
+
+step <- 2.5
+
+
+workout_string = Vectorize(
+	function(wave, lift, day) str_replace_all(
+		cube[[day]][wave],
+		"[1-9]\\d*(?:\\.\\d+)?%",
+		function(x) round(as.numeric(sub("%", "", x)) * one_rep_max[lift] / 100 / step) * step
+	)
+)
 
 
 tibble(
 	wave = rep(1:3, each = 9),
-	lift = rep(c("squat", "bench", "dedlift"), 9),
+	lift = rep(c("squat", "bench", "deadlift"), 9),
 	day = rep(c(names(cube), names(cube)[c(2, 3, 1)], names(cube)[c(3, 1, 2)]), 3)
 ) %>% 
-	mutate(workout = workout_string(day, wave)) %>% 
+	mutate(workout = workout_string(wave, lift, day)) %>% 
 	print.data.frame()
